@@ -1,24 +1,33 @@
 const express = require("express");
+const bodyParser = require("body-parser");
 const mysql = require("mysql2");
-
 const app = express();
-const PORT = process.env.PORT || 8080;
 
-// Create a MySQL connection pool
+const HOST = "0.0.0.0";
+const PORT = 3000;
+
+app.use(bodyParser.json());
+app.use(express.static(__dirname));
+
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST || "mysql",
-  user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASSWORD || "example",
-  database: process.env.MYSQL_DATABASE || "testdb",
+  host: "database",
+  user: "root",
+  password: "admin",
+  database: "project",
+  port: 3306,
 });
 
-// Simple route to test DB connection
-app.get("/api/data", (req, res) => {
-  pool.query("SELECT NOW() as now", (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ currentTime: results[0].now });
+const db = pool.promise();
+
+db.getConnection()
+  .then((connection) => {
+    console.log("Connected to MySQL database");
+    connection.release();
+  })
+  .catch((err) => {
+    console.error("Error connecting to MySQL:", err);
+    process.exit(1);
   });
-});
 
 // Health check
 app.get("/api/health", (req, res) => {
