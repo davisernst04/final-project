@@ -1,22 +1,13 @@
-import React, { useEffect, useState } from "react";
-import "./App.css";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ChannelsPage from "./pages/ChannelsPage";
 
-function App() {
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    fetch("/api/data")
-      .then((res) => res.json())
-      .then((result) => setData(result.currentTime))
-      .catch((error) => console.error("Error fetching data:", error));
-  }, []);
-
+export default function App() {
   return (
-    <div className="App">
-      <h1>Welcome to My Full-Stack App</h1>
-      {data ? <p>Server Time: {data}</p> : <p>Loading...</p>}
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<div>Home Page</div>} />
+        <Route path="/channels" element={<ChannelsPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;
