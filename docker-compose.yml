@@ -28,6 +28,7 @@ services:
       DB_PASSWORD: admin
       DB_PORT: 3306
       DB_DATABASE: project
+      JWT_SECRET: 8daecbd96117273e4f0a439b89298ba1f485a142ea1c6f4e2f4b3e57f6936b1b
     depends_on:
       database:
          condition: service_healthy
