@@ -1,45 +1,52 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const mysql = require("mysql2");
+const mysql = require("mysql2/promise");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 
 const app = express();
 
-const HOST = "0.0.0.0";
-const PORT = 8080;
-
+const PORT = process.env.PORT || 8080;
 app.use(bodyParser.json());
-app.use(express.static(__dirname));
-app.use(cors());
-const pool = mysql.createPool({
-  host: "database",
-  user: "root",
-  password: "admin",
-  database: "project",
-  port: 3306,
+app.use(cors({ origin: "http://localhost:3000" }));
+
+// Database pool
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  port: process.env.DB_PORT,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
-const db = pool.promise();
-
-db.getConnection()
-  .then((connection) => {
-    console.log("Connected to MySQL database");
+// Test database connection
+app.use(async (req, res, next) => {
+  try {
+    const connection = await db.getConnection();
     connection.release();
-  })
-  .catch((err) => {
-    console.error("Error connecting to MySQL:", err);
-    process.exit(1);
-  });
+    next();
+  } catch (error) {
+    console.error("Database connection error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Database connection error" });
+    }
+  }
+});
 
-// Health check
-// Updated registration endpoint
+// Health Check Endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ status: "OK" });
+});
+
+// Update the register endpoint to store classification
 app.post("/api/register", async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, classification } = req.body;
 
   try {
-    // Check if user already exists
     const [existingUsers] = await db.query(
       "SELECT * FROM users WHERE email = ?",
       [email],
@@ -49,32 +56,154 @@ app.post("/api/register", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert new user
     const [result] = await db.query(
-      "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-      [name, email, hashedPassword],
+      "INSERT INTO users (name, email, password, role, classification) VALUES (?, ?, ?, ?, ?)",
+      [name, email, hashedPassword, "user", classification || "beginner"],
     );
 
-    // Set content-type header explicitly
-    res.setHeader("Content-Type", "application/json");
     res.status(201).json({
       message: "User registered successfully",
       userId: result.insertId,
     });
   } catch (error) {
     console.error("Registration error:", error);
-    // Set content-type header explicitly
-    res.setHeader("Content-Type", "application/json");
     res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
   }
 });
 
-// Login User
+app.get("/api/search/advanced", async (req, res) => {
+  const { q, email } = req.query;
+  try {
+    if (q) {
+      const searchTerm = `%${q}%`;
+      const [posts] = await db.query(
+        "SELECT * FROM posts WHERE content LIKE ?",
+        [searchTerm],
+      );
+      res.json({ posts });
+    } else if (email) {
+      const [posts] = await db.query(
+        "SELECT p.* FROM posts p JOIN users u ON p.user_id = u.id WHERE u.email = ?",
+        [email],
+      );
+      res.json({ posts });
+    } else {
+      res
+        .status(400)
+        .json({ message: "Please provide a query string (q) or an email." });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Query for user with most posts
+app.get("/api/search/user-most-posts", async (req, res) => {
+  try {
+    const [result] = await db.query(
+      "SELECT u.*, COUNT(p.id) AS postCount FROM users u LEFT JOIN posts p ON u.id = p.user_id GROUP BY u.id ORDER BY postCount DESC LIMIT 1",
+    );
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Query for user with highest message ranking (based on ratings on posts and replies)
+app.get("/api/search/user-highest-rating", async (req, res) => {
+  try {
+    const [result] = await db.query(
+      `SELECT u.*, 
+          (IFNULL(thumbs_up,0) - IFNULL(thumbs_down,0)) AS ratingScore 
+       FROM users u
+       LEFT JOIN (
+         SELECT user_id, SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS thumbs_up,
+                SUM(CASE WHEN rating = 0 THEN 1 ELSE 0 END) AS thumbs_down
+         FROM (
+           SELECT user_id, rating FROM posts 
+           UNION ALL 
+           SELECT user_id, rating FROM replies
+         ) AS combined
+         GROUP BY user_id
+       ) AS ratings ON u.id = ratings.user_id
+       ORDER BY ratingScore DESC LIMIT 1`,
+    );
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add endpoints for user with least posts and lowest rating
+app.get("/api/search/user-least-posts", async (req, res) => {
+  try {
+    const [result] = await db.query(
+      "SELECT u.*, COUNT(p.id) AS postCount FROM users u LEFT JOIN posts p ON u.id = p.user_id GROUP BY u.id ORDER BY postCount ASC LIMIT 1",
+    );
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/search/user-lowest-rating", async (req, res) => {
+  try {
+    const [result] = await db.query(
+      `SELECT u.*, 
+          (IFNULL(thumbs_up,0) - IFNULL(thumbs_down,0)) AS ratingScore 
+       FROM users u
+       LEFT JOIN (
+         SELECT user_id, SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS thumbs_up,
+                SUM(CASE WHEN rating = 0 THEN 1 ELSE 0 END) AS thumbs_down
+         FROM (
+           SELECT user_id, rating FROM posts 
+           UNION ALL 
+           SELECT user_id, rating FROM replies
+         ) AS combined
+         GROUP BY user_id
+       ) AS ratings ON u.id = ratings.user_id
+       ORDER BY ratingScore ASC LIMIT 1`,
+    );
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/ratings/aggregate", async (req, res) => {
+  const { post_id, reply_id } = req.query;
+  if (!post_id && !reply_id) {
+    return res
+      .status(400)
+      .json({ message: "post_id or reply_id is required." });
+  }
+  try {
+    let query, params;
+    if (post_id) {
+      query = `SELECT 
+                 SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS thumbs_up,
+                 SUM(CASE WHEN rating = 0 THEN 1 ELSE 0 END) AS thumbs_down
+               FROM ratings WHERE post_id = ?`;
+      params = [post_id];
+    } else {
+      query = `SELECT 
+                 SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS thumbs_up,
+                 SUM(CASE WHEN rating = 0 THEN 1 ELSE 0 END) AS thumbs_down
+               FROM ratings WHERE reply_id = ?`;
+      params = [reply_id];
+    }
+    const [result] = await db.query(query, params);
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update the login endpoint to include classification in the response
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -88,29 +217,57 @@ app.post("/api/login", async (req, res) => {
     }
 
     const user = users[0];
-
     const isValidPassword = await bcrypt.compare(password, user.password);
+
     if (!isValidPassword) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET || "your_secret_key",
-      { expiresIn: "1h" },
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1h",
+      },
     );
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        classification: user.classification,
+      },
     });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({
       message: "Internal server error",
       error: error.message,
-      stack: error.stack, // Remove in production
     });
+  }
+});
+
+// Add endpoint to get user by ID
+app.get("/api/users/:userId", async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const [users] = await db.query(
+      "SELECT id, name, email, role, classification FROM users WHERE id = ?",
+      [userId],
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Don't send sensitive information like password
+    res.json(users[0]);
+  } catch (err) {
+    console.error("Error fetching user:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -126,25 +283,44 @@ const authenticateToken = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  jwt.verify(
-    token,
-    process.env.JWT_SECRET || "your_secret_key",
-    (err, user) => {
-      if (err)
-        return res.status(403).json({ message: "Invalid or expired token" });
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err)
+      return res.status(403).json({ message: "Invalid or expired token" });
 
-      req.user = user;
-      next();
-    },
-  );
+    req.user = user;
+    next();
+  });
 };
 
-// ✅ Protected Route Example
-app.get("/api/protected", authenticateToken, (req, res) => {
-  res.json({
-    message: "You have access to this protected route!",
-    user: req.user,
-  });
+// Protected Route Example
+app.get("/api/protected", authenticateToken, async (req, res) => {
+  try {
+    // Get the full user data from the database
+    const [users] = await db.query(
+      "SELECT id, name, email, role, classification FROM users WHERE id = ?",
+      [req.user.id],
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = users[0];
+
+    res.json({
+      message: "You have access to this protected route!",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        classification: user.classification || "beginner",
+      },
+    });
+  } catch (error) {
+    console.error("Protected route error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 // ----- CHANNELS ENDPOINTS -----
@@ -174,13 +350,9 @@ app.get("/api/channels", async (req, res) => {
 
 // ----- POSTS & REPLIES ENDPOINTS -----
 // Create a post in a channel
-app.post("/api/posts", async (req, res) => {
+app.post("/api/posts", authenticateToken, async (req, res) => {
   const { channel_id, content, image_url } = req.body;
-  const user_id = req.body.user_id;
-
-  if (!user_id) {
-    return res.status(400).json({ message: "user_id is required." });
-  }
+  const user_id = req.user.id; // Obtained from token
 
   try {
     const [result] = await db.query(
@@ -221,12 +393,10 @@ app.post("/api/replies", async (req, res) => {
   }
 });
 
-// Add this GET endpoint in your server.js
-// In your server.js (or wherever your routes are defined)
+// Get replies by post_id or parent_reply_id
 app.get("/api/replies", async (req, res) => {
   const { post_id, parent_reply_id } = req.query;
 
-  // Ensure that at least one of post_id or parent_reply_id is provided.
   if (!post_id && !parent_reply_id) {
     return res
       .status(400)
@@ -237,7 +407,6 @@ app.get("/api/replies", async (req, res) => {
     let query = "SELECT * FROM replies";
     const params = [];
 
-    // Add conditions based on the provided parameters
     if (post_id && parent_reply_id) {
       query += " WHERE post_id = ? AND parent_reply_id = ?";
       params.push(post_id, parent_reply_id);
@@ -256,55 +425,41 @@ app.get("/api/replies", async (req, res) => {
   }
 });
 
-// Example GET endpoint for ratings by post_id or reply_id
-// Add or update a rating for a post or reply
+// Rating endpoints
 app.post("/api/ratings", async (req, res) => {
   const { user_id, post_id, reply_id, rating } = req.body;
 
+  if (![0, 1].includes(rating)) {
+    return res.status(400).json({ message: "Rating must be 0 or 1" });
+  }
+
   try {
-    // Check if the rating value is valid before proceeding
-    if (rating !== null && rating !== 0 && rating !== 1) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Rating must be '1' for upvote, '0' for downvote, or null to remove rating.",
-        });
-    }
-
-    // Check if there's an existing rating by this user for this post/reply
-    const [existingRatings] = await db.query(
-      "SELECT * FROM ratings WHERE user_id = ? AND (post_id = ? OR reply_id = ?)",
-      [user_id, post_id || null, reply_id || null],
+    const [existing] = await db.query(
+      post_id
+        ? "SELECT * FROM ratings WHERE user_id = ? AND post_id = ?"
+        : "SELECT * FROM ratings WHERE user_id = ? AND reply_id = ?",
+      [user_id, post_id || reply_id],
     );
 
-    if (existingRatings.length > 0) {
-      const existingRating = existingRatings[0];
-
-      if (rating === null) {
-        // If rating is null, delete the existing rating
-        await db.query("DELETE FROM ratings WHERE id = ?", [existingRating.id]);
-        return res.json({ message: "Rating removed" });
+    if (existing.length > 0) {
+      if (existing[0].rating === rating) {
+        await db.query("DELETE FROM ratings WHERE id = ?", [existing[0].id]);
+      } else {
+        await db.query("UPDATE ratings SET rating = ? WHERE id = ?", [
+          rating,
+          existing[0].id,
+        ]);
       }
-
-      // If a rating already exists, update it
-      await db.query("UPDATE ratings SET rating = ? WHERE id = ?", [
-        rating,
-        existingRating.id,
-      ]);
-      return res.json({ message: "Rating updated" });
+    } else {
+      await db.query(
+        "INSERT INTO ratings (user_id, post_id, reply_id, rating) VALUES (?, ?, ?, ?)",
+        [user_id, post_id || null, reply_id || null, rating],
+      );
     }
 
-    // If no existing rating, insert a new one
-    await db.query(
-      "INSERT INTO ratings (user_id, post_id, reply_id, rating) VALUES (?, ?, ?, ?)",
-      [user_id, post_id || null, reply_id || null, rating],
-    );
-
-    res.json({ message: "Rating submitted" });
-  } catch (err) {
-    console.error("Error handling rating:", err);
-    res.status(500).json({ error: err.message });
+    res.json({ message: "Rating updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -327,31 +482,41 @@ app.get("/api/ratings", async (req, res) => {
   }
 });
 
-// ----- SEARCH ENDPOINT (Example) -----
-// Search posts by content
+// Search Posts Endpoint
 app.get("/api/search/posts", async (req, res) => {
-  const { q } = req.query;
   try {
+    const { q } = req.query;
+    if (!q || q.length < 3)
+      return res.status(400).json({ error: "Query too short" });
+
+    const searchTerm = `+${String(q)}*`;
+
     const [rows] = await db.query(
-      "SELECT * FROM posts WHERE MATCH(content) AGAINST(? IN NATURAL LANGUAGE MODE)",
-      [q],
+      `SELECT *, MATCH(content) AGAINST(? IN BOOLEAN MODE) AS score 
+       FROM posts 
+       WHERE MATCH(content) AGAINST(? IN BOOLEAN MODE)
+       ORDER BY score DESC`,
+      [searchTerm, searchTerm],
     );
+
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Search error:", err);
+    res.status(500).json({ error: "Search failed" });
   }
 });
 
 // Admin middleware
 const isAdmin = (req, res, next) => {
   const user = req.user;
-  if (!user || user.email !== "admin@admin.com") {
+  if (!user || user.role !== "admin") {
+    // Check role instead of email
     return res.status(403).json({ message: "Access denied. Admin only." });
   }
   next();
 };
 
-// Admin routes (protected by isAdmin middleware)
+// Admin routes
 app.get("/api/admin/users", authenticateToken, isAdmin, async (req, res) => {
   try {
     const [users] = await db.query("SELECT id, name, email FROM users");
@@ -445,6 +610,7 @@ app.delete(
     }
   },
 );
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });

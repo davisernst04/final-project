@@ -1,20 +1,30 @@
-// components/ProtectedRoute.js
-import React from "react";
-import { Navigate } from "react-router-dom";
+"use client";
 
-function ProtectedRoute({ children, isAdmin = false }) {
-  const token = localStorage.getItem("token");
-  const user = JSON.parse(localStorage.getItem("user"));
+// components/ProtectedRoute.jsx
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import LoadingSpinner from "./LoadingSpinner";
 
-  if (!token) {
-    return <Navigate to="/login" replace />;
+export const ProtectedRoute = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
   }
 
-  if (isAdmin && (!user || user.email !== "admin@admin.com")) {
-    return <Navigate to="/" replace />;
+  return user ? <Outlet /> : <Navigate to="/login" />;
+};
+
+export const AdminRoute = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
   }
 
-  return children;
-}
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
 
-export default ProtectedRoute;
+  return user.role === "admin" ? <Outlet /> : <Navigate to="/" />;
+};

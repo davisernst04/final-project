@@ -1,64 +1,54 @@
-import React from "react";
-import { Link, Routes, Route, BrowserRouter } from "react-router-dom";
-import ChannelList from "./components/ChannelList";
-import ChannelView from "./components/ChannelView";
-import Signup from "./components/Signup";
+// App.js
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar";
 import Login from "./components/Login";
-import ProtectedRoute from "./components/ProtectedRoute";
+import Register from "./components/Register";
+import ChannelsList from "./components/ChannelsList";
+import ChannelPage from "./components/ChannelPage";
+import ChannelForm from "./components/ChannelForm";
+import LoadingSpinner from "./components/LoadingSpinner";
+import LandingPage from "./components/LandingPage";
 import Search from "./components/Search";
-import AdminPanel from "./components/AdminPanel";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ProtectedRoute, AdminRoute } from "./components/ProtectedRoute";
+
 function App() {
   return (
-    <BrowserRouter>
-      <div>
-        <h1>Programming Issues Tool</h1>
-        <nav>
-          <Link to="/">Home</Link> | <Link to="/channels">Channels</Link> |{" "}
-          <Link to="/signup">Signup</Link> | <Link to="/login">Login</Link> |{" "}
-          <Link to="/admin">Admin</Link> | <Link to="/search">Search</Link>
-        </nav>
-        <Routes>
-          <Route
-            path="/"
-            element={<div>Welcome to the Programming Issues Tool!</div>}
-          />
-          <Route
-            path="/channels"
-            element={
-              <ProtectedRoute>
-                <ChannelList />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/channels/:channelId"
-            element={
-              <ProtectedRoute>
-                <ChannelView />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute isAdmin={true}>
-                <AdminPanel />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/search"
-            element={
-              <ProtectedRoute>
-                <Search />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <AuthProvider>
+      <Router>
+        <Navbar />
+        <div className="container mt-4">
+          <AppRoutes />
+        </div>
+      </Router>
+    </AuthProvider>
+  );
+}
+
+function AppRoutes() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="/channels" element={<ChannelsList />} />
+        <Route path="/channels/:channelId" element={<ChannelPage />} />
+        <Route path="/search" element={<Search />} />
+      </Route>
+
+      <Route element={<AdminRoute />}>
+        <Route path="/create-channel" element={<ChannelForm />} />
+        <Route path="/channels/:channelId/edit" element={<ChannelForm />} />
+      </Route>
+    </Routes>
   );
 }
 

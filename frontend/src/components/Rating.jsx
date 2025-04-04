@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
@@ -16,7 +16,7 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
       if (postId) params.post_id = postId;
       if (replyId) params.reply_id = replyId;
 
-      const response = await axios.get("http://localhost:8080/api/ratings", {
+      const response = await axios.get("/api/ratings", {
         params,
       });
       const ratings = response.data;
@@ -25,7 +25,14 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
       let up = 0;
       let down = 0;
       let currentUserRating = null;
-      const userId = JSON.parse(localStorage.getItem("user"))?.id;
+      let userId;
+      try {
+        const userStr = localStorage.getItem("user");
+        userId = userStr ? JSON.parse(userStr)?.id : null;
+      } catch (e) {
+        console.error("Error parsing user from localStorage:", e);
+        userId = null;
+      }
 
       ratings.forEach((r) => {
         if (r.rating === 1) up++;
@@ -44,52 +51,35 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
   const handleVote = async (newRating) => {
     try {
       const token = localStorage.getItem("token");
-      const user = JSON.parse(localStorage.getItem("user"));
-      if (!user) return;
+      let user;
+      try {
+        const userStr = localStorage.getItem("user");
+        user = userStr ? JSON.parse(userStr) : null;
+        if (!user) return;
+      } catch (e) {
+        console.error("Error parsing user from localStorage:", e);
+        return;
+      }
 
-      // Determine if the user is removing their vote or changing it
-      const finalRating = userRating === newRating ? null : newRating;
-
-      // Optimistically update local state before sending to backend
-      setUpvotes((prevUpvotes) => {
-        let newUpvotes = prevUpvotes;
-        if (userRating === 1) {
-          newUpvotes--; // Remove existing upvote
-        }
-        if (finalRating === 1) {
-          newUpvotes++; // Add new upvote
-        }
-        return newUpvotes;
-      });
-
-      setDownvotes((prevDownvotes) => {
-        let newDownvotes = prevDownvotes;
-        if (userRating === 0) {
-          newDownvotes--; // Remove existing downvote
-        }
-        if (finalRating === 0) {
-          newDownvotes++; // Add new downvote
-        }
-        return newDownvotes;
-      });
-
-      // Update user's rating locally
-      setUserRating(finalRating);
-
-      // Send request to backend
       await axios.post(
-        "http://localhost:8080/api/ratings",
+        "/api/ratings",
         {
           user_id: user.id,
           post_id: postId || null,
           reply_id: replyId || null,
-          rating: finalRating,
+          rating: newRating,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      // Optionally refetch data from backend to ensure consistency
-      // fetchRatings(); //Comment this line so it doesnt affect current ratings
+      // Immediately update UI instead of waiting for fetch
+      setUserRating((prev) => {
+        if (prev === newRating) return null; // Toggle off
+        return newRating; // Set new rating
+      });
+
+      // Force refresh counts
+      await fetchRatings();
       if (fetchPosts) fetchPosts();
       if (fetchReplies) fetchReplies();
     } catch (error) {

@@ -1,68 +1,83 @@
-// components/Login.js
-import React, { useState } from "react";
-import axios from "axios";
+// components/Login.jsx
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import api from "../utils/api";
 
-function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+const Login = () => {
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("");
+    setLoading(true);
     setError("");
 
     try {
-      const response = await axios.post("http://localhost:8080/api/login", {
-        email,
-        password,
-      });
-
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
+      const res = await api.post("/api/login", formData);
+      // Store user in localStorage
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+      login(res.data.token, res.data.user);
       navigate("/channels");
     } catch (err) {
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
+      console.error("Login error:", err);
+      if (err.response?.status === 400) {
+        setError("Invalid email or password. Please check your credentials.");
       } else {
-        setError("An unexpected error occurred.");
+        setError("Login failed. Please try again later.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
+    <div className="container mt-4">
       <h2>Login</h2>
-      {message && <p style={{ color: "green" }}>{message}</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email">Email:</label>
+        <div className="form-group mb-3">
+          <label>Email address</label>
           <input
             type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            className="form-control"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
             required
           />
         </div>
-        <div>
-          <label htmlFor="password">Password:</label>
+        <div className="form-group mb-3">
+          <label>Password</label>
           <input
             type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            className="form-control"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
             required
           />
         </div>
-        <button type="submit">Login</button>
+        <button
+          type="submit"
+          className="btn btn-primary mt-3"
+          disabled={loading}
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
       </form>
     </div>
   );
-}
+};
 
 export default Login;
