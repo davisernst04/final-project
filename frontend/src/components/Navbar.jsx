@@ -20,7 +20,7 @@ const Navbar = () => {
     <BootstrapNavbar bg="dark" variant="dark" expand="lg" className="mb-4">
       <Container>
         <BootstrapNavbar.Brand as={Link} to="/">
-          Programming Forum
+          Give me a Hand!
         </BootstrapNavbar.Brand>
 
         <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" />

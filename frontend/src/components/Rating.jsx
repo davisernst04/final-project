@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../utils/api"; // Import the api utility instead of axios
 
 function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
   const [userRating, setUserRating] = useState(null); // null = no rating, 1 = upvote, 0 = downvote
@@ -16,7 +16,8 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
       if (postId) params.post_id = postId;
       if (replyId) params.reply_id = replyId;
 
-      const response = await axios.get("/api/ratings", {
+      // Use the api utility instead of axios directly
+      const response = await api.get("/api/ratings", {
         params,
       });
       const ratings = response.data;
@@ -61,16 +62,13 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
         return;
       }
 
-      await axios.post(
-        "/api/ratings",
-        {
-          user_id: user.id,
-          post_id: postId || null,
-          reply_id: replyId || null,
-          rating: newRating,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      // Use the api utility instead of axios directly
+      await api.post("/api/ratings", {
+        user_id: user.id,
+        post_id: postId || null,
+        reply_id: replyId || null,
+        rating: newRating,
+      });
 
       // Immediately update UI instead of waiting for fetch
       setUserRating((prev) => {

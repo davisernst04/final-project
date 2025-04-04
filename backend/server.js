@@ -8,16 +8,16 @@ const cors = require("cors");
 const app = express();
 
 const PORT = process.env.PORT || 8080;
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "50mb" })); // Increased limit for image uploads
 app.use(cors({ origin: "http://localhost:3000" }));
 
 // Database pool
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_DATABASE,
-  port: process.env.DB_PORT,
+  host: process.env.DB_HOST || "database",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "admin",
+  database: process.env.DB_DATABASE || "project",
+  port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -28,6 +28,7 @@ app.use(async (req, res, next) => {
   try {
     const connection = await db.getConnection();
     connection.release();
+    console.log("Database connection successful");
     next();
   } catch (error) {
     console.error("Database connection error:", error);
@@ -225,7 +226,7 @@ app.post("/api/login", async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || "your_jwt_secret_key_here",
       {
         expiresIn: "1h",
       },
@@ -283,13 +284,17 @@ const authenticateToken = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err)
-      return res.status(403).json({ message: "Invalid or expired token" });
+  jwt.verify(
+    token,
+    process.env.JWT_SECRET || "your_jwt_secret_key_here",
+    (err, user) => {
+      if (err)
+        return res.status(403).json({ message: "Invalid or expired token" });
 
-    req.user = user;
-    next();
-  });
+      req.user = user;
+      next();
+    },
+  );
 };
 
 // Protected Route Example
@@ -344,6 +349,53 @@ app.get("/api/channels", async (req, res) => {
     const [rows] = await db.query("SELECT * FROM channels");
     res.json(rows);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add this endpoint after the "Get all channels" endpoint
+// Get a specific channel by ID
+app.get("/api/channels/:channelId", async (req, res) => {
+  const { channelId } = req.params;
+  try {
+    const [rows] = await db.query("SELECT * FROM channels WHERE id = ?", [
+      channelId,
+    ]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Channel not found" });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add this endpoint after the "Get a specific channel by ID" endpoint
+// Update a channel
+app.put("/api/channels/:channelId", authenticateToken, async (req, res) => {
+  const { channelId } = req.params;
+  const { name, description } = req.body;
+
+  try {
+    // Check if the user is an admin
+    if (req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json({ message: "Only admins can update channels" });
+    }
+
+    const [result] = await db.query(
+      "UPDATE channels SET name = ?, description = ? WHERE id = ?",
+      [name, description, channelId],
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Channel not found" });
+    }
+
+    res.json({ message: "Channel updated successfully" });
+  } catch (err) {
+    console.error("Error updating channel:", err);
     res.status(500).json({ error: err.message });
   }
 });

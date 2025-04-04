@@ -22,7 +22,9 @@ const ChannelPage = () => {
           .get(`/api/channels/${channelId}`)
           .catch((err) => {
             if (err.response && err.response.status === 404) {
-              throw new Error("Channel not found");
+              throw new Error(
+                "Channel not found. It may have been deleted or you may have entered an invalid URL.",
+              );
             }
             throw err;
           });
@@ -77,7 +79,18 @@ const ChannelPage = () => {
   }
 
   if (error) {
-    return <div className="alert alert-danger">{error}</div>;
+    return (
+      <div className="alert alert-danger">
+        <h4>Error</h4>
+        <p>{error}</p>
+        <button
+          className="btn btn-primary mt-2"
+          onClick={() => (window.location.href = "/channels")}
+        >
+          Return to Channels List
+        </button>
+      </div>
+    );
   }
 
   return (
