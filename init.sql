@@ -61,21 +61,3 @@ CREATE TABLE IF NOT EXISTS ratings (
   UNIQUE KEY unique_reply_rating (user_id, reply_id)
 );
 
--- Create admin user if it doesn't exist
-INSERT INTO users (name, email, password, role, classification)
-SELECT 'Admin', 'admin@example.com', '$2b$10$JqHRBQZQFrB7aKlYHlhcnuWvlMKtKcQYr3/Ow.y5TLxmJJ6e7Wfdy', 'admin', 'expert'
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@example.com');
-
--- Create some initial channels if none exist
-INSERT INTO channels (name, description, created_by)
-SELECT 'JavaScript', 'Discuss JavaScript programming language', 1
-WHERE NOT EXISTS (SELECT 1 FROM channels LIMIT 1);
-
-INSERT INTO channels (name, description, created_by)
-SELECT 'Python', 'Discuss Python programming language', 1
-WHERE NOT EXISTS (SELECT 1 FROM channels WHERE name = 'Python');
-
-INSERT INTO channels (name, description, created_by)
-SELECT 'Web Development', 'Discuss web development technologies', 1
-WHERE NOT EXISTS (SELECT 1 FROM channels WHERE name = 'Web Development');
-

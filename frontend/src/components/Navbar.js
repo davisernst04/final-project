@@ -35,7 +35,7 @@ const Navbar = () => {
                 <Nav.Link as={Link} to="/search">
                   Search
                 </Nav.Link>
-                {user.role === "admin" && (
+                {user && (
                   <Nav.Link as={Link} to="/create-channel">
                     Create Channel
                   </Nav.Link>
@@ -82,7 +82,6 @@ const Navbar = () => {
   );
 };
 
-// Helper function to get badge color based on classification
 function getClassificationColor(classification) {
   switch (classification) {
     case "beginner":

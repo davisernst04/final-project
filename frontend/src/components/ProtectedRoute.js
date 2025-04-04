@@ -1,6 +1,3 @@
-"use client";
-
-// components/ProtectedRoute.jsx
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "./LoadingSpinner";
@@ -25,6 +22,4 @@ export const AdminRoute = () => {
   if (!user) {
     return <Navigate to="/login" />;
   }
-
-  return user.role === "admin" ? <Outlet /> : <Navigate to="/" />;
 };

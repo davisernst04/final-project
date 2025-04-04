@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import api from "../utils/api"; // Import the api utility instead of axios
+import api from "../utils/api";
 
 function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
-  const [userRating, setUserRating] = useState(null); // null = no rating, 1 = upvote, 0 = downvote
+  const [userRating, setUserRating] = useState(null);
   const [upvotes, setUpvotes] = useState(0);
   const [downvotes, setDownvotes] = useState(0);
 
@@ -16,13 +16,11 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
       if (postId) params.post_id = postId;
       if (replyId) params.reply_id = replyId;
 
-      // Use the api utility instead of axios directly
       const response = await api.get("/api/ratings", {
         params,
       });
       const ratings = response.data;
 
-      // Calculate counts and user's rating
       let up = 0;
       let down = 0;
       let currentUserRating = null;
@@ -62,7 +60,6 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
         return;
       }
 
-      // Use the api utility instead of axios directly
       await api.post("/api/ratings", {
         user_id: user.id,
         post_id: postId || null,
@@ -70,13 +67,10 @@ function Rating({ postId, replyId, fetchPosts, fetchReplies }) {
         rating: newRating,
       });
 
-      // Immediately update UI instead of waiting for fetch
       setUserRating((prev) => {
-        if (prev === newRating) return null; // Toggle off
-        return newRating; // Set new rating
+        if (prev === newRating) return null;
+        return newRating;
       });
-
-      // Force refresh counts
       await fetchRatings();
       if (fetchPosts) fetchPosts();
       if (fetchReplies) fetchReplies();

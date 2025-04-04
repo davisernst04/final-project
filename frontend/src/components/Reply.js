@@ -3,6 +3,8 @@ import api from "../utils/api";
 import Rating from "./Rating";
 import { useAuth } from "../context/AuthContext";
 
+import { getImageUrl } from "../utils/getImageUrl";
+
 function Reply({ reply, fetchReplies, fetchPosts }) {
   const [replies, setReplies] = useState([]);
   const [newReplyContent, setNewReplyContent] = useState("");
@@ -55,27 +57,21 @@ function Reply({ reply, fetchReplies, fetchPosts }) {
         return;
       }
 
-      // Convert file to Base64 if an image is provided.
-      let imageBase64 = "";
+      const formData = new FormData();
+      formData.append("user_id", user.id);
+      formData.append("post_id", reply.post_id);
+      formData.append("parent_reply_id", reply.id);
+      formData.append("content", newReplyContent);
+
       if (newReplyImage) {
-        imageBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(newReplyImage);
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = (error) => reject(error);
-        });
+        formData.append("image", newReplyImage);
       }
 
-      // Build the JSON payload.
-      const replyData = {
-        user_id: user.id,
-        post_id: reply.post_id,
-        parent_reply_id: reply.id,
-        content: newReplyContent,
-        image_url: imageBase64,
-      };
-
-      const response = await api.post("/api/replies", replyData);
+      const response = await api.post("/api/replies", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       setMessage(response.data.message);
       setNewReplyContent("");
@@ -122,7 +118,7 @@ function Reply({ reply, fetchReplies, fetchPosts }) {
       <p className="mb-2">{reply.content}</p>
       {reply.image_url && (
         <img
-          src={reply.image_url || "/placeholder.svg"}
+          src={getImageUrl(reply.image_url)}
           alt="Reply Image"
           className="img-fluid mb-2"
           style={{ maxWidth: "100%", maxHeight: "300px" }}

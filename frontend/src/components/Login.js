@@ -1,4 +1,3 @@
-// components/Login.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -25,7 +24,6 @@ const Login = () => {
 
     try {
       const res = await api.post("/api/login", formData);
-      // Store user in localStorage
       localStorage.setItem("user", JSON.stringify(res.data.user));
       login(res.data.token, res.data.user);
       navigate("/channels");

@@ -4,6 +4,7 @@ import Rating from "./Rating";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 
+import { getImageUrl } from "../utils/getImageUrl";
 function Post({ post, fetchPosts, onEdit, onDelete }) {
   const [replies, setReplies] = useState([]);
   const [newReplyContent, setNewReplyContent] = useState("");
@@ -52,25 +53,20 @@ function Post({ post, fetchPosts, onEdit, onDelete }) {
         return;
       }
 
-      // If there's an image, convert it to a Base64 string.
-      let imageBase64 = "";
+      const formData = new FormData();
+      formData.append("user_id", user.id);
+      formData.append("post_id", post.id);
+      formData.append("content", newReplyContent);
       if (newReplyImage) {
-        imageBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(newReplyImage);
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = (error) => reject(error);
-        });
+        formData.append("image", newReplyImage);
       }
 
-      const replyData = {
-        user_id: user.id,
-        post_id: post.id,
-        content: newReplyContent,
-        image_url: imageBase64,
-      };
+      const response = await api.post("/api/replies", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-      const response = await api.post("/api/replies", replyData);
       setMessage(response.data.message);
       setNewReplyContent("");
       setNewReplyImage(null);
@@ -102,7 +98,7 @@ function Post({ post, fetchPosts, onEdit, onDelete }) {
         <h5 className="card-title">{post.content}</h5>
         {post.image_url && (
           <img
-            src={post.image_url || "/placeholder.svg"}
+            src={getImageUrl(post.image_url)}
             alt="Post Image"
             className="img-fluid mb-3"
             style={{ maxWidth: "100%", maxHeight: "400px" }}
@@ -184,7 +180,6 @@ function Post({ post, fetchPosts, onEdit, onDelete }) {
   );
 }
 
-// Helper function to get badge color based on classification
 function getClassificationColor(classification) {
   switch (classification) {
     case "beginner":

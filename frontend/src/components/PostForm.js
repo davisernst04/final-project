@@ -1,13 +1,12 @@
 import { useState } from "react";
 import api from "../utils/api";
-import { useAuth } from "../context/AuthContext";
 
+import { getImageUrl } from "../utils/getImageUrl";
 const PostForm = ({ channelId, existingPost, onCancel, onSuccess }) => {
   const [content, setContent] = useState(existingPost?.content || "");
   const [image, setImage] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,26 +14,21 @@ const PostForm = ({ channelId, existingPost, onCancel, onSuccess }) => {
     setLoading(true);
 
     try {
-      let imageBase64 = "";
+      const formData = new FormData();
+      formData.append("channel_id", channelId);
+      formData.append("content", content);
       if (image) {
-        imageBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(image);
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = (error) => reject(error);
-        });
+        formData.append("image", image);
       }
 
-      const postData = {
-        content,
-        channel_id: channelId,
-        image_url: imageBase64,
-      };
-
       if (existingPost) {
-        await api.put(`/api/posts/${existingPost.id}`, postData);
+        await api.put(`/api/posts/${existingPost.id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       } else {
-        await api.post("/api/posts", postData);
+        await api.post("/api/posts", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
 
       setContent("");
@@ -90,8 +84,8 @@ const PostForm = ({ channelId, existingPost, onCancel, onSuccess }) => {
                   Current image will be kept if no new image is selected
                 </p>
                 <img
-                  src={existingPost.image_url || "/placeholder.svg"}
-                  alt="Current post image"
+                  src={getImageUrl(existingPost.image_url)}
+                  alt="Current post"
                   style={{ maxWidth: "200px" }}
                   className="img-thumbnail"
                 />

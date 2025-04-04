@@ -5,7 +5,7 @@ import Login from "./components/Login";
 import Register from "./components/Register";
 import ChannelsList from "./components/ChannelsList";
 import ChannelPage from "./components/ChannelPage";
-import ChannelForm from "./components/ChannelForm";
+import CreateChannel from "./components/CreateChannel";
 import LoadingSpinner from "./components/LoadingSpinner";
 import LandingPage from "./components/LandingPage";
 import Search from "./components/Search";
@@ -42,11 +42,7 @@ function AppRoutes() {
         <Route path="/channels" element={<ChannelsList />} />
         <Route path="/channels/:channelId" element={<ChannelPage />} />
         <Route path="/search" element={<Search />} />
-      </Route>
-
-      <Route element={<AdminRoute />}>
-        <Route path="/create-channel" element={<ChannelForm />} />
-        <Route path="/channels/:channelId/edit" element={<ChannelForm />} />
+        <Route path="/create-channel" element={<CreateChannel />} />
       </Route>
     </Routes>
   );

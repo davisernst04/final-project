@@ -36,11 +36,9 @@ const Search = () => {
         response = await api.get("/api/search/user-least-posts");
         setResults([response.data]);
       } else {
-        // default search by content string or email if query contains an @
         let endpoint = "/api/search/advanced";
         endpoint += query.includes("@") ? `?email=${query}` : `?q=${query}`;
         response = await api.get(endpoint);
-        // if searching by content, our endpoint returns { posts: [...] }
         setResults(response.data.posts || []);
       }
     } catch (err) {
@@ -131,7 +129,6 @@ const Search = () => {
   );
 };
 
-// Helper function to get badge color based on classification
 function getClassificationColor(classification) {
   switch (classification) {
     case "beginner":

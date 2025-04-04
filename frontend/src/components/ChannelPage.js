@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import PostForm from "./PostForm";
-import ConfirmationModal from "./ConfirmationModal";
 import api from "../utils/api";
 import Post from "./Post";
 
@@ -17,7 +16,6 @@ const ChannelPage = () => {
       setLoading(true);
       setError(null);
       try {
-        // First, check if the channel exists
         const channelRes = await api
           .get(`/api/channels/${channelId}`)
           .catch((err) => {
@@ -31,7 +29,6 @@ const ChannelPage = () => {
 
         setChannel(channelRes.data);
 
-        // Then fetch posts for this channel
         const postsRes = await api.get(`/api/channels/${channelId}/posts`);
         setPosts(postsRes.data);
       } catch (err) {
@@ -53,25 +50,6 @@ const ChannelPage = () => {
     } catch (err) {
       console.error("Error fetching posts:", err);
     }
-  };
-
-  const handleDeletePost = async (postId) => {
-    try {
-      await api.delete(`/api/posts/${postId}`);
-      setPosts(posts.filter((post) => post.id !== postId));
-    } catch (err) {
-      console.error("Error deleting post:", err);
-      setError("Failed to delete post. Please try again.");
-    }
-  };
-
-  const [editingPost, setEditingPost] = useState(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedPost, setSelectedPost] = useState(null);
-
-  const handleEditPost = (post) => {
-    setEditingPost(post);
-    window.scrollTo(0, 0);
   };
 
   if (loading) {
@@ -102,19 +80,7 @@ const ChannelPage = () => {
         </div>
       )}
 
-      {editingPost ? (
-        <PostForm
-          channelId={channelId}
-          existingPost={editingPost}
-          onCancel={() => setEditingPost(null)}
-          onSuccess={() => {
-            setEditingPost(null);
-            fetchPosts();
-          }}
-        />
-      ) : (
-        <PostForm channelId={channelId} onSuccess={fetchPosts} />
-      )}
+      <PostForm channelId={channelId} onSuccess={fetchPosts} />
 
       <h3 className="mt-4">Posts</h3>
 
@@ -125,29 +91,10 @@ const ChannelPage = () => {
       ) : (
         <div>
           {posts.map((post) => (
-            <Post
-              key={post.id}
-              post={post}
-              fetchPosts={fetchPosts}
-              onEdit={() => handleEditPost(post)}
-              onDelete={() => {
-                setSelectedPost(post.id);
-                setShowDeleteModal(true);
-              }}
-            />
+            <Post key={post.id} post={post} fetchPosts={fetchPosts} />
           ))}
         </div>
       )}
-
-      <ConfirmationModal
-        show={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={async () => {
-          await handleDeletePost(selectedPost);
-          setShowDeleteModal(false);
-        }}
-        message="Are you sure you want to delete this post?"
-      />
     </div>
   );
 };

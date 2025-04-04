@@ -26,31 +26,27 @@ const ChannelsList = () => {
     fetchChannels();
   }, []);
 
-  const handleDelete = async (channelId) => {
-    try {
-      await api.delete(`/api/admin/channels/${channelId}`);
-      setChannels(channels.filter((c) => c.id !== channelId));
-    } catch (err) {
-      console.error("Error deleting channel:", err);
-      setError("Failed to delete channel. Please try again.");
-    }
-  };
-
   if (loading) {
     return <div className="text-center my-5">Loading channels...</div>;
   }
 
   return (
-    <div>
-      <h2>Channels</h2>
+    <div className="container mt-4">
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2>Channels</h2>
+        {user && (
+          <Link to="/create-channel" className="btn btn-primary">
+            Create Channel
+          </Link>
+        )}
+      </div>
+
       {error && <div className="alert alert-danger">{error}</div>}
 
       {channels.length === 0 ? (
         <div className="alert alert-info">
           No channels available.{" "}
-          {user?.role === "admin" && (
-            <Link to="/create-channel">Create a channel</Link>
-          )}
+          {user && <Link to="/create-channel">Create your first channel</Link>}
         </div>
       ) : (
         <div className="row row-cols-1 row-cols-md-3 g-4">
@@ -62,34 +58,10 @@ const ChannelsList = () => {
                     <Link to={`/channels/${channel.id}`}>{channel.name}</Link>
                   </h5>
                   <p className="card-text">{channel.description}</p>
-                  {user?.role === "admin" && (
-                    <div className="mt-2">
-                      <Link
-                        to={`/channels/${channel.id}/edit`}
-                        className="btn btn-sm btn-warning me-2"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(channel.id)}
-                        className="btn btn-sm btn-danger"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {user?.role === "admin" && (
-        <div className="mt-4">
-          <Link to="/create-channel" className="btn btn-primary">
-            Create New Channel
-          </Link>
         </div>
       )}
     </div>

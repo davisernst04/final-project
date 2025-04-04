@@ -12,7 +12,6 @@ const LandingPage = () => {
           <div className="col-md-8 offset-md-2">
             <div className="card mb-4">
               <div className="card-body">
-                <h5 className="card-title">About This Forum</h5>
                 <p className="card-text">
                   This is a channel-based tool for programmers to ask and answer
                   programming related questions. It is designed to be a friendly
